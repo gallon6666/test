@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>星轨收集者</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="hud" aria-label="游戏状态">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>星轨收集者</span>
+        </div>
+        <div class="stats">
+          <span class="stat">分数 <strong id="score">0</strong></span>
+          <span class="stat">等级 <strong id="level">1</strong></span>
+          <span class="stat">生命 <strong id="lives">3</strong></span>
+          <span class="stat">最佳 <strong id="best">0</strong></span>
+        </div>
+        <div class="hud-actions">
+          <button id="pauseButton" class="icon-button" type="button" title="暂停" aria-label="暂停">
+            <span aria-hidden="true">II</span>
+          </button>
+          <button id="restartButton" class="icon-button" type="button" title="重开" aria-label="重开">
+            <span aria-hidden="true">↻</span>
+          </button>
+        </div>
+      </header>
+
+      <canvas id="gameCanvas" aria-label="星轨收集者游戏画面"></canvas>
+
+      <section id="startPanel" class="overlay-panel" aria-live="polite">
+        <h1>星轨收集者</h1>
+        <p>接住金色星尘，避开红色陨石。</p>
+        <button id="startButton" class="primary-button" type="button">开始</button>
+      </section>
+
+      <section id="gameOverPanel" class="overlay-panel is-hidden" aria-live="polite">
+        <h2>本轮结束</h2>
+        <p>得分 <strong id="finalScore">0</strong></p>
+        <button id="againButton" class="primary-button" type="button">再来一局</button>
+      </section>
+
+      <nav class="touch-controls" aria-label="移动控制">
+        <button id="leftButton" class="touch-button" type="button" title="向左" aria-label="向左">‹</button>
+        <button id="rightButton" class="touch-button" type="button" title="向右" aria-label="向右">›</button>
+      </nav>
+    </main>
+
+    <script src="game.js"></script>
+  </body>
+</html>
