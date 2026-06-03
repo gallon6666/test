@@ -35,6 +35,7 @@ const state = {
   keys: new Set(),
   objects: [],
   stars: [],
+  lanes: [],
   ripples: [],
 };
 
@@ -69,16 +70,27 @@ function resizeCanvas() {
   player.y = state.height - Math.max(78, state.height * 0.12);
 
   makeStarfield();
+  makeLanes();
 }
 
 function makeStarfield() {
-  const count = Math.round(clamp(state.width * state.height * 0.0001, 70, 150));
+  const count = Math.round(clamp(state.width * state.height * 0.00013, 80, 180));
   state.stars = Array.from({ length: count }, () => ({
     x: random(0, state.width),
     y: random(0, state.height),
     size: random(0.5, 2.2),
-    drift: random(8, 34),
-    alpha: random(0.28, 0.9),
+    drift: random(18, 58),
+    alpha: random(0.22, 0.9),
+  }));
+}
+
+function makeLanes() {
+  const laneCount = Math.round(clamp(state.width / 190, 4, 7));
+  state.lanes = Array.from({ length: laneCount }, (_, index) => ({
+    offset: index / laneCount,
+    width: random(0.42, 0.9),
+    speed: random(0.18, 0.42),
+    alpha: random(0.15, 0.36),
   }));
 }
 
@@ -189,6 +201,10 @@ function update(delta) {
     }
   }
 
+  for (const lane of state.lanes) {
+    lane.offset = (lane.offset + lane.speed * delta) % 1;
+  }
+
   for (const item of state.objects) {
     item.y += item.speed * delta;
     item.angle += item.spin * delta;
@@ -227,7 +243,7 @@ function resolveCollisions() {
       y: item.y,
       radius: 8,
       speed: item.kind === "meteor" ? 170 : 115,
-      color: item.kind === "meteor" ? "rgba(255, 77, 109," : "rgba(255, 209, 102,",
+      color: item.kind === "meteor" ? "rgba(244, 63, 94," : "rgba(248, 214, 109,",
       life: 0.42,
     });
 
@@ -245,56 +261,115 @@ function resolveCollisions() {
 
 function drawBackground() {
   const sky = ctx.createLinearGradient(0, 0, 0, state.height);
-  sky.addColorStop(0, "#07111f");
-  sky.addColorStop(0.58, "#172b3b");
-  sky.addColorStop(1, "#111827");
+  sky.addColorStop(0, "#120916");
+  sky.addColorStop(0.35, "#0b1718");
+  sky.addColorStop(0.78, "#172114");
+  sky.addColorStop(1, "#090c0d");
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, state.width, state.height);
+
+  drawAurora();
 
   ctx.save();
   for (const star of state.stars) {
     ctx.globalAlpha = star.alpha;
-    ctx.fillStyle = star.size > 1.6 ? "#ffd166" : "#e6f4ff";
+    ctx.fillStyle = star.size > 1.6 ? "#f8d66d" : "#d8fff8";
     ctx.beginPath();
     ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 
-  const horizon = state.height * 0.78;
-  const haze = ctx.createLinearGradient(0, horizon - 80, 0, state.height);
-  haze.addColorStop(0, "rgba(76, 201, 240, 0)");
-  haze.addColorStop(0.5, "rgba(76, 201, 240, 0.08)");
-  haze.addColorStop(1, "rgba(255, 209, 102, 0.08)");
-  ctx.fillStyle = haze;
-  ctx.fillRect(0, horizon - 100, state.width, state.height);
-
-  drawMountains(horizon);
+  const horizon = state.height * 0.75;
+  drawFlightLanes(horizon);
+  drawSkyline(horizon);
 }
 
-function drawMountains(horizon) {
+function drawAurora() {
   ctx.save();
-  ctx.fillStyle = "rgba(3, 9, 18, 0.42)";
+  ctx.globalCompositeOperation = "screen";
+  for (let i = 0; i < 3; i += 1) {
+    const y = state.height * (0.18 + i * 0.13);
+    const gradient = ctx.createLinearGradient(0, y - 60, state.width, y + 80);
+    gradient.addColorStop(0, "rgba(49, 214, 199, 0)");
+    gradient.addColorStop(0.34, i === 1 ? "rgba(125, 220, 145, 0.12)" : "rgba(49, 214, 199, 0.13)");
+    gradient.addColorStop(0.66, i === 2 ? "rgba(244, 63, 94, 0.12)" : "rgba(248, 214, 109, 0.1)");
+    gradient.addColorStop(1, "rgba(49, 214, 199, 0)");
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 34 + i * 12;
+    ctx.beginPath();
+    ctx.moveTo(-40, y);
+    for (let x = -40; x <= state.width + 40; x += 70) {
+      ctx.lineTo(x, y + Math.sin(x * 0.01 + state.starTimer * (0.4 + i * 0.15)) * (26 + i * 10));
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawFlightLanes(horizon) {
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  const vanishingX = state.width / 2;
+  const vanishingY = horizon - state.height * 0.12;
+
+  for (const lane of state.lanes) {
+    const spread = state.width * (0.2 + lane.offset * 0.65);
+    ctx.strokeStyle = `rgba(49, 214, 199, ${lane.alpha})`;
+    ctx.lineWidth = lane.width;
+    ctx.beginPath();
+    ctx.moveTo(vanishingX - spread, state.height);
+    ctx.lineTo(vanishingX, vanishingY);
+    ctx.lineTo(vanishingX + spread, state.height);
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < 9; i += 1) {
+    const t = ((i / 9 + state.starTimer * 0.18) % 1) ** 1.85;
+    const y = vanishingY + (state.height - vanishingY) * t;
+    const width = state.width * t * 0.84;
+    ctx.strokeStyle = `rgba(248, 214, 109, ${0.26 - t * 0.16})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(vanishingX - width / 2, y);
+    ctx.lineTo(vanishingX + width / 2, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawSkyline(horizon) {
+  ctx.save();
+  const haze = ctx.createLinearGradient(0, horizon - 80, 0, state.height);
+  haze.addColorStop(0, "rgba(49, 214, 199, 0)");
+  haze.addColorStop(0.44, "rgba(49, 214, 199, 0.08)");
+  haze.addColorStop(1, "rgba(248, 214, 109, 0.09)");
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, horizon - 110, state.width, state.height);
+
+  ctx.fillStyle = "rgba(4, 10, 9, 0.5)";
   ctx.beginPath();
   ctx.moveTo(0, state.height);
   for (let x = 0; x <= state.width + 80; x += 80) {
-    const y = horizon + Math.sin(x * 0.012) * 24;
+    const y = horizon + Math.sin(x * 0.012) * 22;
     ctx.lineTo(x, y);
   }
   ctx.lineTo(state.width, state.height);
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = "rgba(3, 8, 16, 0.74)";
-  ctx.beginPath();
-  ctx.moveTo(0, state.height);
-  for (let x = 0; x <= state.width + 70; x += 70) {
-    const y = horizon + 50 + Math.cos(x * 0.011) * 20;
-    ctx.lineTo(x, y);
+  ctx.fillStyle = "rgba(5, 8, 9, 0.82)";
+  for (let x = -12; x < state.width + 24; x += 28) {
+    const buildingHeight = 18 + ((x * 17) % 46 + 46) % 46;
+    const width = 13 + ((x * 11) % 18 + 18) % 18;
+    ctx.fillRect(x, horizon + 72 - buildingHeight, width, state.height - horizon);
+
+    if (x % 56 === 0) {
+      ctx.fillStyle = "rgba(248, 214, 109, 0.45)";
+      ctx.fillRect(x + width * 0.45, horizon + 76 - buildingHeight, 2, 6);
+      ctx.fillStyle = "rgba(5, 8, 9, 0.82)";
+    }
   }
-  ctx.lineTo(state.width, state.height);
-  ctx.closePath();
-  ctx.fill();
   ctx.restore();
 }
 
@@ -304,37 +379,45 @@ function drawPlayer() {
   ctx.rotate((player.tilt * Math.PI) / 180);
 
   const beam = ctx.createRadialGradient(0, 0, 2, 0, 12, player.width * 0.72);
-  beam.addColorStop(0, "rgba(76, 201, 240, 0.5)");
-  beam.addColorStop(1, "rgba(76, 201, 240, 0)");
+  beam.addColorStop(0, "rgba(49, 214, 199, 0.55)");
+  beam.addColorStop(0.44, "rgba(125, 220, 145, 0.2)");
+  beam.addColorStop(1, "rgba(49, 214, 199, 0)");
   ctx.fillStyle = beam;
   ctx.beginPath();
-  ctx.ellipse(0, 20, player.width * 0.75, player.height * 1.8, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 24, player.width * 0.72, player.height * 1.9, 0, 0, Math.PI * 2);
   ctx.fill();
 
   const body = ctx.createLinearGradient(-player.width / 2, 0, player.width / 2, 0);
-  body.addColorStop(0, "#4cc9f0");
-  body.addColorStop(0.5, "#f7fafc");
-  body.addColorStop(1, "#ffd166");
+  body.addColorStop(0, "#31d6c7");
+  body.addColorStop(0.42, "#fffaf0");
+  body.addColorStop(0.7, "#f8d66d");
+  body.addColorStop(1, "#f43f5e");
   ctx.fillStyle = body;
-  roundedRect(-player.width / 2, -player.height / 2, player.width, player.height, 12);
+  roundedRect(-player.width / 2, -player.height / 2, player.width, player.height, 10);
   ctx.fill();
 
-  ctx.fillStyle = "rgba(7, 17, 31, 0.72)";
-  roundedRect(-player.width * 0.18, -player.height * 0.28, player.width * 0.36, player.height * 0.48, 6);
+  ctx.strokeStyle = "rgba(255, 250, 240, 0.62)";
+  ctx.lineWidth = 1.5;
+  roundedRect(-player.width / 2 + 3, -player.height / 2 + 3, player.width - 6, player.height - 6, 8);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(9, 12, 13, 0.78)";
+  roundedRect(-player.width * 0.18, -player.height * 0.3, player.width * 0.36, player.height * 0.5, 5);
   ctx.fill();
 
-  ctx.fillStyle = "#ff4d6d";
+  ctx.fillStyle = "#f43f5e";
   ctx.beginPath();
-  ctx.moveTo(-player.width / 2 - 10, 0);
-  ctx.lineTo(-player.width / 2 + 6, -player.height / 2 + 2);
-  ctx.lineTo(-player.width / 2 + 6, player.height / 2 - 2);
+  ctx.moveTo(-player.width / 2 - 14, 2);
+  ctx.lineTo(-player.width / 2 + 8, -player.height / 2 + 1);
+  ctx.lineTo(-player.width / 2 + 8, player.height / 2 - 1);
   ctx.closePath();
   ctx.fill();
 
+  ctx.fillStyle = "#7ddc91";
   ctx.beginPath();
-  ctx.moveTo(player.width / 2 + 10, 0);
-  ctx.lineTo(player.width / 2 - 6, -player.height / 2 + 2);
-  ctx.lineTo(player.width / 2 - 6, player.height / 2 - 2);
+  ctx.moveTo(player.width / 2 + 14, 2);
+  ctx.lineTo(player.width / 2 - 8, -player.height / 2 + 1);
+  ctx.lineTo(player.width / 2 - 8, player.height / 2 - 1);
   ctx.closePath();
   ctx.fill();
 
@@ -356,9 +439,15 @@ function drawStar(item) {
   ctx.save();
   ctx.translate(item.x, item.y);
   ctx.rotate(item.angle);
-  ctx.shadowColor = "rgba(255, 209, 102, 0.85)";
-  ctx.shadowBlur = 18 * item.glow;
-  ctx.fillStyle = "#ffd166";
+  ctx.shadowColor = "rgba(248, 214, 109, 0.9)";
+  ctx.shadowBlur = 22 * item.glow;
+  ctx.strokeStyle = "rgba(49, 214, 199, 0.42)";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.arc(0, 0, item.size * 0.66, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = "#f8d66d";
   ctx.beginPath();
   for (let i = 0; i < 10; i += 1) {
     const radius = i % 2 === 0 ? item.size * 0.48 : item.size * 0.2;
@@ -369,7 +458,7 @@ function drawStar(item) {
   ctx.fill();
 
   ctx.shadowBlur = 0;
-  ctx.fillStyle = "rgba(255, 255, 255, 0.72)";
+  ctx.fillStyle = "rgba(255, 250, 240, 0.76)";
   ctx.beginPath();
   ctx.arc(-item.size * 0.1, -item.size * 0.12, item.size * 0.1, 0, Math.PI * 2);
   ctx.fill();
@@ -380,21 +469,22 @@ function drawMeteor(item) {
   ctx.save();
   ctx.translate(item.x, item.y);
   ctx.rotate(item.angle);
-  ctx.shadowColor = "rgba(255, 77, 109, 0.75)";
-  ctx.shadowBlur = 18;
+  ctx.shadowColor = "rgba(244, 63, 94, 0.82)";
+  ctx.shadowBlur = 22;
 
   const tail = ctx.createLinearGradient(-item.size * 1.4, 0, item.size * 0.3, 0);
-  tail.addColorStop(0, "rgba(255, 77, 109, 0)");
-  tail.addColorStop(1, "rgba(255, 209, 102, 0.45)");
+  tail.addColorStop(0, "rgba(244, 63, 94, 0)");
+  tail.addColorStop(0.55, "rgba(49, 214, 199, 0.18)");
+  tail.addColorStop(1, "rgba(248, 214, 109, 0.55)");
   ctx.fillStyle = tail;
   ctx.beginPath();
   ctx.ellipse(-item.size * 0.65, 0, item.size, item.size * 0.23, 0, 0, Math.PI * 2);
   ctx.fill();
 
   const rock = ctx.createRadialGradient(-item.size * 0.18, -item.size * 0.24, 2, 0, 0, item.size * 0.55);
-  rock.addColorStop(0, "#ffb703");
-  rock.addColorStop(0.42, "#ff4d6d");
-  rock.addColorStop(1, "#66101f");
+  rock.addColorStop(0, "#f8d66d");
+  rock.addColorStop(0.36, "#f43f5e");
+  rock.addColorStop(1, "#3b111f");
   ctx.fillStyle = rock;
   ctx.beginPath();
   ctx.arc(0, 0, item.size * 0.48, 0, Math.PI * 2);
@@ -422,9 +512,9 @@ function drawRipples() {
 function drawPaused() {
   if (!state.paused) return;
   ctx.save();
-  ctx.fillStyle = "rgba(5, 10, 19, 0.34)";
+  ctx.fillStyle = "rgba(10, 15, 18, 0.42)";
   ctx.fillRect(0, 0, state.width, state.height);
-  ctx.fillStyle = "#f7fafc";
+  ctx.fillStyle = "#fffaf0";
   ctx.font = "800 42px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.fillText("暂停", state.width / 2, state.height / 2);

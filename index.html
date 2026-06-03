@@ -8,10 +8,11 @@
   </head>
   <body>
     <main class="game-shell">
+      <div class="screen-vignette" aria-hidden="true"></div>
       <header class="hud" aria-label="游戏状态">
         <div class="brand">
           <span class="brand-mark" aria-hidden="true"></span>
-          <span>星轨收集者</span>
+          <span>STARLINE 07</span>
         </div>
         <div class="stats">
           <span class="stat">分数 <strong id="score">0</strong></span>
@@ -32,12 +33,14 @@
       <canvas id="gameCanvas" aria-label="星轨收集者游戏画面"></canvas>
 
       <section id="startPanel" class="overlay-panel" aria-live="polite">
+        <span class="panel-kicker">NOVA RUN</span>
         <h1>星轨收集者</h1>
-        <p>接住金色星尘，避开红色陨石。</p>
-        <button id="startButton" class="primary-button" type="button">开始</button>
+        <p>夜航开始，保持航线。</p>
+        <button id="startButton" class="primary-button" type="button">开始巡航</button>
       </section>
 
       <section id="gameOverPanel" class="overlay-panel is-hidden" aria-live="polite">
+        <span class="panel-kicker">RUN COMPLETE</span>
         <h2>本轮结束</h2>
         <p>得分 <strong id="finalScore">0</strong></p>
         <button id="againButton" class="primary-button" type="button">再来一局</button>
