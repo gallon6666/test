@@ -14,9 +14,22 @@ const restartButton = document.querySelector("#restartButton");
 const againButton = document.querySelector("#againButton");
 const leftButton = document.querySelector("#leftButton");
 const rightButton = document.querySelector("#rightButton");
+const supportPanel = document.querySelector("#supportPanel");
+const supportCloseButton = document.querySelector("#supportCloseButton");
+const supportContinueButton = document.querySelector("#supportContinueButton");
+const aiBoostMessage = document.querySelector("#aiBoostMessage");
+const tipStatus = document.querySelector("#tipStatus");
+const tipButtons = document.querySelectorAll(".tip-button");
 
 const STORAGE_KEY = "star-courier-best-score";
+const TIP_STORAGE_KEY = "star-courier-tip-total";
 const DPR_CAP = 2;
+const BOOST_MESSAGES = [
+  "AI 航线分析：节奏很好，保持横向小幅移动，星尘会自己落进航道。",
+  "AI 补给建议：你的反应窗口正在变短，优先躲红色陨石，再追金色星尘。",
+  "AI 机载播报：这一段速度会上来，稳住底部中线，别让飞船追得太急。",
+  "AI 士气模块：当前表现稳定，继续收集星尘可以快速拉开最佳分数。"
+];
 
 const state = {
   width: 0,
@@ -29,9 +42,12 @@ const state = {
   level: 1,
   lives: 3,
   best: Number(localStorage.getItem(STORAGE_KEY) || 0),
+  tipTotal: Number(localStorage.getItem(TIP_STORAGE_KEY) || 0),
   lastTime: 0,
   spawnTimer: 0,
   starTimer: 0,
+  supportOpen: false,
+  promptedLevels: new Set(),
   keys: new Set(),
   objects: [],
   stars: [],
@@ -104,8 +120,12 @@ function resetGame() {
   state.spawnTimer = 0.35;
   state.starTimer = 0;
   state.lastTime = performance.now();
+  state.supportOpen = false;
+  state.promptedLevels = new Set();
   state.objects = [];
   state.ripples = [];
+  supportPanel.classList.add("is-hidden");
+  tipStatus.textContent = "模拟支付，不产生真实交易。";
   player.x = state.width / 2;
   player.tilt = 0;
   updateHud();
@@ -143,7 +163,7 @@ function updateHud() {
 }
 
 function togglePause() {
-  if (!state.running || state.gameOver) return;
+  if (!state.running || state.gameOver || state.supportOpen) return;
   state.paused = !state.paused;
   state.lastTime = performance.now();
   pauseButton.setAttribute("aria-label", state.paused ? "继续" : "暂停");
@@ -179,11 +199,15 @@ function movePlayer(delta) {
 }
 
 function update(delta) {
-  if (!state.running || state.paused) return;
+  if (!state.running || state.paused || state.supportOpen) return;
 
   state.starTimer += delta;
   state.spawnTimer -= delta;
-  state.level = Math.floor(state.score / 120) + 1;
+  const nextLevel = Math.floor(state.score / 120) + 1;
+  if (nextLevel !== state.level) {
+    state.level = nextLevel;
+    maybeOpenSupportPanel(nextLevel);
+  }
 
   const spawnEvery = clamp(0.8 - state.level * 0.045, 0.28, 0.8);
   if (state.spawnTimer <= 0) {
@@ -219,6 +243,31 @@ function update(delta) {
   }
 
   updateHud();
+}
+
+function shouldShowSupport(level) {
+  return level > 1 && (level === 2 || level % 3 === 0) && !state.promptedLevels.has(level);
+}
+
+function maybeOpenSupportPanel(level) {
+  if (!shouldShowSupport(level)) return;
+  state.promptedLevels.add(level);
+  state.supportOpen = true;
+  tipStatus.textContent = `模拟支付，不产生真实交易。累计打气 ¥${state.tipTotal}`;
+  aiBoostMessage.textContent = BOOST_MESSAGES[level % BOOST_MESSAGES.length];
+  supportPanel.classList.remove("is-hidden");
+}
+
+function closeSupportPanel() {
+  state.supportOpen = false;
+  state.lastTime = performance.now();
+  supportPanel.classList.add("is-hidden");
+}
+
+function handleTip(amount) {
+  state.tipTotal += amount;
+  localStorage.setItem(TIP_STORAGE_KEY, String(state.tipTotal));
+  tipStatus.textContent = `模拟支付成功：AI 士气 +${amount}，累计打气 ¥${state.tipTotal}`;
 }
 
 function resolveCollisions() {
@@ -556,8 +605,17 @@ function setHeld(button, key) {
 
 window.addEventListener("resize", resizeCanvas);
 window.addEventListener("keydown", (event) => {
+  if (state.supportOpen && event.code === "Escape") {
+    closeSupportPanel();
+    return;
+  }
+
   if (event.code === "Space") {
     event.preventDefault();
+    if (state.supportOpen) {
+      closeSupportPanel();
+      return;
+    }
     if (!state.running) startGame();
     else togglePause();
     return;
@@ -567,7 +625,7 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("keyup", (event) => state.keys.delete(event.code));
 
 canvas.addEventListener("pointermove", (event) => {
-  if (!state.running || state.paused) return;
+  if (!state.running || state.paused || state.supportOpen) return;
   const rect = canvas.getBoundingClientRect();
   player.x = clamp(event.clientX - rect.left, player.width / 2 + 10, state.width - player.width / 2 - 10);
 });
@@ -576,6 +634,11 @@ startButton.addEventListener("click", startGame);
 againButton.addEventListener("click", startGame);
 restartButton.addEventListener("click", startGame);
 pauseButton.addEventListener("click", togglePause);
+supportCloseButton.addEventListener("click", closeSupportPanel);
+supportContinueButton.addEventListener("click", closeSupportPanel);
+for (const button of tipButtons) {
+  button.addEventListener("click", () => handleTip(Number(button.dataset.tip || 0)));
+}
 setHeld(leftButton, "ArrowLeft");
 setHeld(rightButton, "ArrowRight");
 
